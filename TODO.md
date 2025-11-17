@@ -1,1080 +1,586 @@
-# CasePack - Production Readiness Checklist
+# Life-Doc-Vault - Implementation TODO
 
-**Current Status:** MVP Foundation Complete
-**Estimated Time to Launch:** 2-4 weeks (depending on features prioritized)
-
----
-
-## 📋 Table of Contents
-
-1. [Immediate Setup (Required to Run)](#immediate-setup)
-2. [Critical Missing Components](#critical-missing-components)
-3. [Database & Migrations](#database--migrations)
-4. [Frontend Completion](#frontend-completion)
-5. [Testing & QA](#testing--qa)
-6. [Security Hardening](#security-hardening)
-7. [Production Deployment](#production-deployment)
-8. [Post-Launch Tasks](#post-launch-tasks)
-9. [Optional Enhancements](#optional-enhancements)
+**Status:** 🚧 Building from Scratch
+**Started:** 2025-11-17
+**Target Launch:** Q1 2026
 
 ---
 
-## 🔴 Immediate Setup (Required to Run)
+## 🎯 What Needs to Be Built
 
-### 1. API Keys & Credentials
+This document tracks everything that needs to be implemented for Life-Doc-Vault to become a production-ready SaaS application.
 
-**Status:** ❌ Not Configured
-**Estimated Time:** 15 minutes
-**Priority:** CRITICAL
+---
 
-**Required:**
+## Phase 1: Foundation & Project Structure ⏳ IN PROGRESS
 
+### 1.1 Repository Cleanup ✅ DONE
+- [x] Remove Court-Case-Packet documentation
+- [x] Create new Life-Doc-Vault README
+- [x] Update TODO.md with build plan
+
+### 1.2 Next.js Application Setup ❌ TODO
+- [ ] Initialize Next.js 14 with TypeScript (`npx create-next-app@latest`)
+- [ ] Configure App Router structure
+- [ ] Set up Tailwind CSS
+- [ ] Install and configure shadcn/ui components
+- [ ] Create basic layout structure
+
+### 1.3 Database Setup ❌ TODO
+- [ ] Install Prisma (`npm install prisma @prisma/client`)
+- [ ] Initialize Prisma (`npx prisma init`)
+- [ ] Design database schema (see Phase 2)
+- [ ] Create initial migration
+- [ ] Set up PostgreSQL (local or cloud)
+
+### 1.4 Development Environment ❌ TODO
+- [ ] Create `.env.local` template
+- [ ] Set up environment variable validation
+- [ ] Configure ESLint and Prettier
+- [ ] Add Git hooks (Husky) for code quality
+- [ ] Update docker-compose.yml for new structure
+
+**Estimated Time:** 2-3 days
+
+---
+
+## Phase 2: Database Schema & Models ❌ TODO
+
+### 2.1 Core Tables
+```prisma
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String    // Hashed
+  role          Role      @default(USER)
+  subscription  Tier?     @default(FREE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  documents     Document[]
+  sessions      Session[]
+  auditLogs     AuditLog[]
+}
+
+model Document {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  filename       String
+  originalName   String
+  mimeType       String
+  fileSize       Int
+  storagePath    String
+  category       Category?
+  uploadedAt     DateTime     @default(now())
+  extractedData  Json?        // AI extraction results
+  ocrText        String?      // OCR extracted text
+  events         Event[]
+  tags           Tag[]
+  isDeleted      Boolean      @default(false)
+  deletedAt      DateTime?
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  documentId  String
+  document    Document  @relation(fields: [documentId], references: [id])
+  eventDate   DateTime
+  description String
+  entities    String[]  // People, places, organizations
+  confidence  Float     // 0.0 to 1.0
+  createdAt   DateTime  @default(now())
+}
+
+model Packet {
+  id          String     @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  documents   Document[]
+  generatedAt DateTime?
+  pdfPath     String?
+  status      PacketStatus @default(DRAFT)
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Tier {
+  FREE
+  PERSONAL
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum Category {
+  LEGAL
+  MEDICAL
+  FINANCIAL
+  PERSONAL
+  OTHER
+}
+
+enum PacketStatus {
+  DRAFT
+  PROCESSING
+  READY
+  FAILED
+}
+```
+
+### 2.2 Additional Tables Needed
+- [ ] `Session` - NextAuth sessions
+- [ ] `VerificationToken` - Email verification
+- [ ] `Account` - OAuth providers (optional)
+- [ ] `AuditLog` - Security and compliance tracking
+- [ ] `Subscription` - Payment and billing info
+- [ ] `Tag` - Document tagging system
+- [ ] `ApiKey` - For enterprise users (future)
+
+**Estimated Time:** 1-2 days
+
+---
+
+## Phase 3: Authentication System ❌ TODO
+
+### 3.1 NextAuth Setup
+- [ ] Install NextAuth.js (`npm install next-auth`)
+- [ ] Configure auth providers:
+  - [ ] Email/Password (Credentials provider)
+  - [ ] Email Magic Links (optional)
+  - [ ] Google OAuth (optional)
+- [ ] Create `/api/auth/[...nextauth]/route.ts`
+- [ ] Set up JWT strategy
+- [ ] Implement password hashing (bcrypt)
+
+### 3.2 Auth Pages & Components
+- [ ] Login page (`/app/(auth)/login/page.tsx`)
+- [ ] Register page (`/app/(auth)/register/page.tsx`)
+- [ ] Password reset flow
+- [ ] Email verification (if using magic links)
+- [ ] Auth middleware for protected routes
+
+### 3.3 Session Management
+- [ ] Server-side session validation
+- [ ] Client-side session hooks
+- [ ] Role-based access control (RBAC)
+- [ ] Session timeout handling
+
+**Estimated Time:** 3-4 days
+
+---
+
+## Phase 4: Core UI Components ❌ TODO
+
+### 4.1 shadcn/ui Installation
 ```bash
-# Anthropic API Key
-ANTHROPIC_API_KEY=sk-ant-...
-# Get from: https://console.anthropic.com
-# Cost: $5 free credits, then pay-as-go ($0.25/MTok for Haiku)
-
-# Stripe Keys (use test mode first)
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-# Get from: https://dashboard.stripe.com/test/apikeys
-# Cost: Free for testing, 2.9% + $0.30 per transaction in production
-
-# Generate Secrets
-SECRET_KEY=$(openssl rand -hex 32)
-NEXTAUTH_SECRET=$(openssl rand -hex 32)
+npx shadcn-ui@latest init
+npx shadcn-ui@latest add button card input label toast dialog
+npx shadcn-ui@latest add dropdown-menu avatar badge progress
+npx shadcn-ui@latest add table tabs select checkbox form
 ```
 
-**Action Items:**
-- [ ] Create Anthropic account and get API key
-- [ ] Create Stripe account and get test keys
-- [ ] Generate secure secrets
-- [ ] Update `.env` file with all keys
-- [ ] Verify keys are valid (test API calls)
+### 4.2 Layout Components
+- [ ] Root layout (`/app/layout.tsx`)
+- [ ] Navigation header
+- [ ] Sidebar (for dashboard)
+- [ ] Footer
+- [ ] Mobile menu
+
+### 4.3 Page Templates
+- [ ] Landing page (`/app/page.tsx`)
+- [ ] Dashboard layout (`/app/dashboard/layout.tsx`)
+- [ ] Error pages (404, 500)
+- [ ] Loading states
+
+**Estimated Time:** 2-3 days
 
 ---
 
-## 🔴 Critical Missing Components
+## Phase 5: Document Management ❌ TODO
 
-### 2. Database Migrations (Alembic)
+### 5.1 File Upload System
+- [ ] Create upload API route (`/api/documents/upload/route.ts`)
+- [ ] Implement drag-and-drop upload component
+- [ ] File type validation (magic bytes)
+- [ ] File size validation (tier-based limits)
+- [ ] Progress indicators
+- [ ] Multi-file upload support
 
-**Status:** ❌ Not Implemented
-**Estimated Time:** 2 hours
-**Priority:** CRITICAL
+### 5.2 Storage Implementation
+- [ ] Local storage adapter (development)
+- [ ] S3 storage adapter (production):
+  - [ ] `src/lib/storage/s3-adapter.ts`
+  - [ ] Upload to S3
+  - [ ] Download from S3
+  - [ ] Delete from S3
+  - [ ] Generate signed URLs
+  - [ ] Support for DigitalOcean Spaces/MinIO
 
-**What's Missing:**
-- No Alembic migration files exist
-- Database tables won't be created automatically
-- Schema changes can't be versioned
+### 5.3 Document CRUD Operations
+- [ ] List documents (`/api/documents/route.ts`)
+- [ ] Get document details (`/api/documents/[id]/route.ts`)
+- [ ] Update document metadata
+- [ ] Delete document
+- [ ] Soft delete with retention policy
 
-**Action Items:**
+### 5.4 Document UI
+- [ ] Documents list view (`/app/dashboard/documents/page.tsx`)
+- [ ] Document detail view (`/app/dashboard/documents/[id]/page.tsx`)
+- [ ] Upload modal/page
+- [ ] Document preview (PDF, images)
+- [ ] Search and filter
 
-```bash
-# 1. Initialize Alembic (if not done)
-cd backend
-alembic init alembic
-
-# 2. Configure alembic.ini
-# Edit: sqlalchemy.url = postgresql://...
-
-# 3. Create initial migration
-alembic revision --autogenerate -m "Initial schema"
-
-# 4. Review migration file in alembic/versions/
-
-# 5. Apply migration
-alembic upgrade head
-```
-
-**Files to Create:**
-- `backend/alembic.ini` - Alembic configuration
-- `backend/alembic/env.py` - Migration environment
-- `backend/alembic/versions/001_initial.py` - Initial migration
-
-**Resources:**
-- Alembic docs: https://alembic.sqlalchemy.org/en/latest/tutorial.html
+**Estimated Time:** 5-7 days
 
 ---
 
-### 3. Async Worker Task Fix
+## Phase 6: AI & OCR Integration ❌ TODO
 
-**Status:** ⚠️ Partially Complete
-**Estimated Time:** 3 hours
-**Priority:** HIGH
+### 6.1 OCR Service
+- [ ] Install Tesseract.js (`npm install tesseract.js`)
+- [ ] Create OCR service (`/src/lib/ocr/ocr-service.ts`)
+- [ ] Extract text from images
+- [ ] Extract text from PDFs
+- [ ] Handle multi-page documents
+- [ ] Cache OCR results
 
-**Issue:**
-The `parser_service.parse_file_and_extract_events()` is marked as `async` but Celery tasks are synchronous by default.
+### 6.2 AI Document Analysis
+- [ ] Install Anthropic SDK (`npm install @anthropic-ai/sdk`)
+- [ ] Create AI service (`/src/lib/ai/document-analyzer.ts`)
+- [ ] Extract key dates
+- [ ] Extract entities (people, organizations, locations)
+- [ ] Extract events
+- [ ] Categorize documents
+- [ ] Confidence scoring
 
-**File:** `backend/app/workers/tasks.py` (line ~80)
+### 6.3 Event Timeline
+- [ ] Event extraction from documents
+- [ ] Timeline generation algorithm
+- [ ] Timeline UI component
+- [ ] Event editing/refinement
+- [ ] Event filtering and search
 
-**Current Code:**
-```python
-result = await parser_service.parse_file_and_extract_events(...)
-```
-
-**Fix Required:**
-```python
-# Option 1: Make parser service synchronous
-result = parser_service.parse_file_and_extract_events_sync(...)
-
-# Option 2: Use asyncio.run() in Celery task
-import asyncio
-result = asyncio.run(parser_service.parse_file_and_extract_events(...))
-```
-
-**Action Items:**
-- [ ] Refactor parser service to support sync calls
-- [ ] Test file processing workflow end-to-end
-- [ ] Verify events are created in database
+**Estimated Time:** 6-8 days
 
 ---
 
-### 4. File Type Detection & Validation
+## Phase 7: Evidence Packet Generation ❌ TODO
 
-**Status:** ⚠️ Basic Implementation
-**Estimated Time:** 4 hours
-**Priority:** HIGH
+### 7.1 PDF Generation
+- [ ] Install PDF library (`npm install jspdf` or `pdfkit`)
+- [ ] Create PDF generator service
+- [ ] Template system for different packet types:
+  - [ ] Legal evidence packet
+  - [ ] Medical records summary
+  - [ ] Financial documentation
+  - [ ] Personal timeline
+- [ ] Include table of contents
+- [ ] Include chronological timeline
+- [ ] Include document exhibits
 
-**What's Missing:**
-- No MIME type validation beyond basic checks
-- No file size limits enforced
-- No virus scanning (optional but recommended)
-- No support for DOCX, CSV, or other document types
+### 7.2 Packet Management
+- [ ] Create packet (`/api/packets/route.ts`)
+- [ ] Add documents to packet
+- [ ] Generate packet PDF
+- [ ] Download packet
+- [ ] Share packet (optional)
 
-**Action Items:**
+### 7.3 Packet UI
+- [ ] Packet creation wizard
+- [ ] Packet editor
+- [ ] Packet preview
+- [ ] Download interface
 
-```python
-# Add to backend/app/services/file_validator.py
-
-import magic
-import filetype
-
-ALLOWED_MIME_TYPES = [
-    'image/jpeg', 'image/png', 'image/gif',
-    'application/pdf',
-    'text/plain', 'text/csv',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-]
-
-def validate_file(file_bytes: bytes, filename: str) -> dict:
-    # Detect actual MIME type
-    mime = magic.from_buffer(file_bytes, mime=True)
-
-    # Validate against allowed types
-    if mime not in ALLOWED_MIME_TYPES:
-        raise ValueError(f"File type {mime} not allowed")
-
-    # Check file size
-    if len(file_bytes) > settings.MAX_UPLOAD_SIZE:
-        raise ValueError("File too large")
-
-    return {"mime_type": mime, "valid": True}
-```
-
-**Action Items:**
-- [ ] Install `python-magic` and `filetype` libraries
-- [ ] Create file validator service
-- [ ] Add DOCX text extraction (using `python-docx`)
-- [ ] Add CSV parsing support
-- [ ] Update file upload endpoint to use validator
+**Estimated Time:** 5-6 days
 
 ---
 
-### 5. PDF2Image Dependency
+## Phase 8: Payments & Subscriptions ❌ TODO
 
-**Status:** ❌ Not Installed
-**Estimated Time:** 30 minutes
-**Priority:** HIGH
+### 8.1 Stripe Integration
+- [ ] Install Stripe SDK (`npm install stripe @stripe/stripe-js`)
+- [ ] Set up Stripe account and products
+- [ ] Create pricing tiers in Stripe Dashboard
+- [ ] Implement Checkout API (`/api/checkout/route.ts`)
+- [ ] Handle webhooks (`/api/webhooks/stripe/route.ts`)
+- [ ] Subscription management
 
-**Issue:**
-OCR service tries to import `pdf2image` for PDF OCR fallback, but it's not in requirements.txt.
+### 8.2 Billing Features
+- [ ] Usage tracking (storage, document count)
+- [ ] Upgrade/downgrade flow
+- [ ] Payment history
+- [ ] Invoice generation
+- [ ] Subscription cancellation
 
-**File:** `backend/app/services/ocr.py` (line ~125)
+### 8.3 Pricing UI
+- [ ] Pricing page
+- [ ] Upgrade prompts
+- [ ] Billing dashboard
+- [ ] Usage meters
 
-**Action Items:**
-
-```bash
-# Add to requirements.txt
-pdf2image==1.16.3
-
-# Also need poppler-utils (already in Dockerfile)
-```
-
-- [ ] Add `pdf2image` to `requirements.txt`
-- [ ] Test PDF OCR with scanned documents
-- [ ] Handle ImportError gracefully if not installed
-
----
-
-### 6. API Authentication Fixes
-
-**Status:** ⚠️ Incomplete
-**Estimated Time:** 2 hours
-**Priority:** HIGH
-
-**Issue:**
-Authentication dependency in `deps.py` uses raw SQL instead of SQLAlchemy ORM.
-
-**File:** `backend/app/api/deps.py` (line ~45)
-
-**Current Code:**
-```python
-result = await db.execute(
-    "SELECT * FROM users WHERE id = :user_id", {"user_id": int(user_id)}
-)
-user = result.first()
-```
-
-**Fix Required:**
-```python
-from sqlalchemy import select
-from app.models.user import User
-
-result = await db.execute(
-    select(User).where(User.id == int(user_id))
-)
-user = result.scalar_one_or_none()
-```
-
-**Action Items:**
-- [ ] Fix authentication dependency
-- [ ] Test login/register endpoints
-- [ ] Verify JWT token validation works
-- [ ] Add token refresh endpoint (optional)
+**Estimated Time:** 4-5 days
 
 ---
 
-## 🟡 Frontend Completion
+## Phase 9: Security Implementation ❌ TODO
 
-### 7. Build Complete Frontend UI
+### 9.1 CSRF Protection
+- [ ] Backend CSRF token generation (`/src/lib/csrf.ts`)
+- [ ] Middleware to validate CSRF tokens
+- [ ] Frontend API client with CSRF support
+- [ ] Cookie-based token storage
 
-**Status:** ❌ Only Landing Page Exists
-**Estimated Time:** 2-3 weeks
-**Priority:** HIGH
+### 9.2 Rate Limiting
+- [ ] Install Redis client (`npm install ioredis`)
+- [ ] Create rate limiter middleware (`/src/lib/rate-limit.ts`)
+- [ ] Apply to API routes:
+  - [ ] Upload: 10 requests/minute
+  - [ ] Auth: 5 requests/minute
+  - [ ] API: 60 requests/minute
 
-**What's Missing:**
+### 9.3 Input Validation & Sanitization
+- [ ] Install Zod (`npm install zod`)
+- [ ] Create validation schemas
+- [ ] Sanitize user inputs (DOMPurify)
+- [ ] SQL injection prevention (Prisma handles this)
+- [ ] XSS prevention
 
-#### Authentication Pages
-- [ ] `/auth/login` - Login form
-- [ ] `/auth/register` - Registration form
-- [ ] `/auth/logout` - Logout handler
-- [ ] NextAuth configuration
+### 9.4 File Security
+- [ ] Magic bytes validation for file uploads
+- [ ] Filename sanitization
+- [ ] Path traversal prevention
+- [ ] File size limits
+- [ ] Malware scanning (optional: ClamAV)
 
-#### User Dashboard
-- [ ] `/dashboard` - Case list view
-- [ ] `/dashboard/cases/new` - Create case form
-- [ ] Case cards with status indicators
-- [ ] Quick stats (total cases, files, etc.)
-
-#### Case Management
-- [ ] `/case/[id]` - Case detail view
-- [ ] File upload component (drag & drop)
-- [ ] Processing status indicator
-- [ ] Timeline preview
-
-#### Timeline Review
-- [ ] `/case/[id]/timeline` - Event list/table
-- [ ] Edit event modal
-- [ ] Hide/show events toggle
-- [ ] Reorder events (drag & drop)
-- [ ] Confidence indicators
-
-#### Payment Flow
-- [ ] `/case/[id]/payment` - Pricing tier selection
-- [ ] Stripe checkout integration
-- [ ] Payment success page
-- [ ] Payment failure handling
-
-#### Download Center
-- [ ] `/case/[id]/download` - Download links
-- [ ] PDF preview (optional)
-- [ ] ZIP download button
-- [ ] Share/access controls
-
-#### Admin Panel
-- [ ] `/admin/dashboard` - System stats
-- [ ] `/admin/cases` - All cases list
-- [ ] `/admin/users` - User management
-- [ ] Error logs viewer
-
-**Estimated Breakdown:**
-- Auth pages: 2 days
-- Dashboard: 3 days
-- Case management: 5 days
-- Timeline review: 4 days
-- Payment flow: 2 days
-- Download center: 2 days
-- Admin panel: 3 days
-
-**Total:** ~15-20 days of frontend development
+**Estimated Time:** 3-4 days
 
 ---
 
-### 8. Frontend API Integration
+## Phase 10: Monitoring & Error Tracking ❌ TODO
+
+### 10.1 Sentry Setup
+- [ ] Install Sentry (`npm install @sentry/nextjs`)
+- [ ] Create `sentry.client.config.ts`
+- [ ] Create `sentry.server.config.ts`
+- [ ] Create `sentry.edge.config.ts`
+- [ ] Create `instrumentation.ts` (Next.js 14)
+- [ ] Configure error reporting
+- [ ] Add breadcrumbs for debugging
+
+### 10.2 Logging
+- [ ] Set up structured logging
+- [ ] Add request ID tracking
+- [ ] Log critical operations
+- [ ] Sanitize PII from logs
+
+### 10.3 Analytics
+- [ ] Vercel Analytics (built-in)
+- [ ] Custom event tracking
+- [ ] User behavior analytics
 
-**Status:** ❌ Not Started
-**Estimated Time:** 1 week
-**Priority:** HIGH
-
-**Action Items:**
-
-Create API client:
-
-```typescript
-// frontend/src/lib/api.ts
-
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-export const authAPI = {
-  login: (email: string, password: string) =>
-    api.post('/api/v1/auth/login', { email, password }),
-  register: (email: string, password: string) =>
-    api.post('/api/v1/auth/register', { email, password }),
-};
-
-export const casesAPI = {
-  list: () => api.get('/api/v1/cases/'),
-  create: (data: CreateCaseRequest) => api.post('/api/v1/cases/', data),
-  get: (id: number) => api.get(`/api/v1/cases/${id}`),
-  delete: (id: number) => api.delete(`/api/v1/cases/${id}`),
-};
-
-export const filesAPI = {
-  upload: (caseId: number, file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post(`/api/v1/files/upload/${caseId}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-  },
-};
-```
-
-**Action Items:**
-- [ ] Create API client with TypeScript types
-- [ ] Set up React Query for data fetching
-- [ ] Add error handling and retry logic
-- [ ] Implement loading states
-- [ ] Add optimistic updates
-
----
-
-## 🟡 Database & Migrations
-
-### 9. Create Initial Admin User
-
-**Status:** ❌ Not Created
-**Estimated Time:** 15 minutes
-**Priority:** MEDIUM
-
-**Action Items:**
-
-```python
-# Create script: backend/scripts/create_admin.py
-
-from app.core.database import SessionLocal
-from app.core.security import get_password_hash
-from app.models.user import User, UserRole
-from app.core.config import settings
-
-db = SessionLocal()
-
-admin = User(
-    email=settings.ADMIN_EMAIL,
-    hashed_password=get_password_hash(settings.ADMIN_PASSWORD),
-    role=UserRole.ADMIN,
-    is_active=True,
-)
-
-db.add(admin)
-db.commit()
-
-print(f"✅ Admin user created: {admin.email}")
-```
-
-Run after database setup:
-```bash
-docker-compose exec backend python scripts/create_admin.py
-```
-
----
-
-### 10. Data Retention Cleanup Job
-
-**Status:** ❌ Not Implemented
-**Estimated Time:** 3 hours
-**Priority:** MEDIUM
-
-**What's Needed:**
-Script to auto-delete expired cases (30 days old)
-
-**Action Items:**
-
-```python
-# Create: backend/app/scripts/cleanup_expired_cases.py
-
-from datetime import datetime
-from app.core.database import SessionLocal
-from app.models.case import Case
-from app.services.storage import storage_service
-from app.models.audit_log import AuditLog, AuditAction
-
-db = SessionLocal()
-
-# Find expired cases
-expired_cases = db.query(Case).filter(
-    Case.retention_expiry_at < datetime.utcnow()
-).all()
-
-for case in expired_cases:
-    # Delete files from storage
-    storage_service.delete_case_files(case.id)
-
-    # Log deletion
-    audit = AuditLog(
-        case_id=case.id,
-        action=AuditAction.SYSTEM_RETENTION_CLEANUP,
-    )
-    db.add(audit)
-
-    # Delete case (cascades to files, events, etc.)
-    db.delete(case)
-
-db.commit()
-print(f"✅ Deleted {len(expired_cases)} expired cases")
-```
-
-**Cron Setup:**
-```bash
-# Add to crontab (run daily at 2am)
-0 2 * * * cd /path/to/app && docker-compose exec -T backend python -m app.scripts.cleanup_expired_cases
-```
-
----
-
-## 🟢 Testing & QA
-
-### 11. Unit Tests
-
-**Status:** ❌ Not Written
-**Estimated Time:** 1 week
-**Priority:** MEDIUM
-
-**Coverage Needed:**
-- [ ] User authentication (register, login)
-- [ ] Case CRUD operations
-- [ ] File upload and validation
-- [ ] OCR service
-- [ ] Event extraction
-- [ ] Timeline builder
-- [ ] PDF generation
-- [ ] Payment flow
-
-**Example Test:**
-
-```python
-# backend/tests/test_auth.py
-
-import pytest
-from httpx import AsyncClient
-from app.main import app
-
-@pytest.mark.asyncio
-async def test_register_user():
-    async with AsyncClient(app=app, base_url="http://test") as client:
-        response = await client.post("/api/v1/auth/register", json={
-            "email": "test@example.com",
-            "password": "SecurePass123!",
-        })
-        assert response.status_code == 201
-        assert "access_token" in response.json()
-```
-
-**Action Items:**
-- [ ] Set up pytest configuration
-- [ ] Create test database
-- [ ] Write unit tests for all services
-- [ ] Write API integration tests
-- [ ] Set up CI/CD to run tests
-
----
-
-### 12. End-to-End Testing
-
-**Status:** ❌ Not Started
-**Estimated Time:** 3 days
-**Priority:** LOW
-
-**Test Cases:**
-
-1. **Complete User Journey:**
-   - Register → Login → Create Case → Upload Files → Review Timeline → Pay → Download
-
-2. **File Processing:**
-   - Upload various file types (PDF, JPG, PNG)
-   - Verify OCR extraction
-   - Check event creation
-   - Validate timeline accuracy
-
-3. **Payment Flow:**
-   - Test Stripe checkout
-   - Verify webhook handling
-   - Confirm access unlocked
-
-**Tools:**
-- Playwright or Cypress for frontend E2E
-- Manual testing initially acceptable
-
----
-
-## 🔒 Security Hardening
-
-### 13. Security Enhancements
-
-**Status:** ⚠️ Basic Security Only
-**Estimated Time:** 1 week
-**Priority:** HIGH (before production)
-
-**Required:**
-
-#### Rate Limiting
-```python
-# Add to backend/app/api/deps.py
-
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
-limiter = Limiter(key_func=get_remote_address)
-
-# Usage in routes:
-@router.post("/auth/login")
-@limiter.limit("5/minute")
-async def login(...):
-    ...
-```
-
-#### Input Validation
-- [ ] Add Pydantic validators for all inputs
-- [ ] Sanitize file names
-- [ ] Validate email formats
-- [ ] Enforce password complexity
-
-#### HTTPS/TLS
-- [ ] Configure SSL certificates (Let's Encrypt)
-- [ ] Force HTTPS redirects
-- [ ] Set security headers (HSTS, CSP, etc.)
-
-#### Secrets Management
-- [ ] Use environment variables (not hardcoded)
-- [ ] Rotate API keys regularly
-- [ ] Use secrets manager in production (AWS Secrets Manager, etc.)
-
-#### Database Security
-- [ ] Use prepared statements (already done via SQLAlchemy)
-- [ ] Encrypt sensitive columns (optional)
-- [ ] Set up database backups
-
-**Action Items:**
-- [ ] Install and configure `slowapi` for rate limiting
-- [ ] Add CORS validation
-- [ ] Implement request size limits
-- [ ] Set up Sentry for error tracking
-- [ ] Create security.txt file
-
----
-
-### 14. GDPR/Privacy Compliance
-
-**Status:** ⚠️ Basic Privacy Features
 **Estimated Time:** 2 days
-**Priority:** MEDIUM
-
-**Required:**
-
-- [ ] Privacy Policy page
-- [ ] Terms of Service page
-- [ ] Cookie consent banner (if using cookies)
-- [ ] Data export endpoint (user can download their data)
-- [ ] Account deletion endpoint
-- [ ] Email opt-out mechanism (if sending emails)
-
-**Files to Create:**
-- `frontend/src/app/privacy/page.tsx`
-- `frontend/src/app/terms/page.tsx`
-- Add `/api/v1/users/me/export` endpoint
-- Add `/api/v1/users/me/delete` endpoint
 
 ---
 
-## 🚀 Production Deployment
-
-### 15. Environment Configuration
-
-**Status:** ❌ Development Only
-**Estimated Time:** 1 day
-**Priority:** HIGH
-
-**Production .env Changes:**
-
-```bash
-# Change from development to production
-ENVIRONMENT=production
-DEBUG=false
-
-# Use production database
-DATABASE_URL=postgresql://user:pass@prod-db.example.com:5432/casepack
-
-# Use production Redis
-REDIS_URL=redis://prod-redis.example.com:6379/0
-
-# Use production Stripe keys
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_PUBLISHABLE_KEY=pk_live_...
-
-# Set production URLs
-NEXTAUTH_URL=https://yourdomain.com
-ALLOWED_ORIGINS=https://yourdomain.com
-
-# Use S3 for storage (not local)
-STORAGE_TYPE=s3
-AWS_BUCKET_NAME=casepack-prod
-
-# Enable monitoring
-SENTRY_DSN=https://...@sentry.io/...
-LOG_LEVEL=WARNING
-```
-
----
-
-### 16. Deploy Backend
-
-**Status:** ❌ Not Deployed
-**Estimated Time:** 1 day
-**Priority:** HIGH
-
-**Recommended Platforms:**
-
-#### Option A: Railway (Easiest)
-```bash
-# 1. Install Railway CLI
-npm install -g @railway/cli
-
-# 2. Login
-railway login
-
-# 3. Create project
-railway init
-
-# 4. Add PostgreSQL
-railway add postgresql
-
-# 5. Add Redis
-railway add redis
-
-# 6. Deploy
-railway up
-```
-
-Cost: ~$20/month
-
-#### Option B: DigitalOcean App Platform
-1. Connect GitHub repo
-2. Select `backend` directory
-3. Add environment variables
-4. Add PostgreSQL and Redis managed databases
-5. Deploy
-
-Cost: ~$30/month
-
-#### Option C: Docker on VPS
-1. Provision droplet ($12/month)
-2. Install Docker
-3. Clone repo
-4. Run `docker-compose up -d`
-5. Configure Nginx reverse proxy
-6. Get SSL certificate
-
-Cost: ~$12/month + managed DB
-
-**Action Items:**
-- [ ] Choose deployment platform
-- [ ] Set up managed PostgreSQL
-- [ ] Set up managed Redis
-- [ ] Configure environment variables
-- [ ] Deploy backend
-- [ ] Run database migrations
-- [ ] Test API endpoints
-
----
-
-### 17. Deploy Frontend
-
-**Status:** ❌ Not Deployed
-**Estimated Time:** 2 hours
-**Priority:** HIGH
-
-**Recommended: Vercel (Free Tier)**
-
-```bash
-# 1. Install Vercel CLI
-npm install -g vercel
-
-# 2. Login
-vercel login
-
-# 3. Deploy from frontend directory
-cd frontend
-vercel
-
-# 4. Set environment variables in Vercel dashboard:
-NEXT_PUBLIC_API_URL=https://your-backend-url.com
-NEXTAUTH_SECRET=...
-NEXTAUTH_URL=https://your-frontend-url.com
-```
-
-**Action Items:**
-- [ ] Deploy frontend to Vercel
-- [ ] Configure custom domain (optional)
-- [ ] Set environment variables
-- [ ] Test frontend → backend connection
-- [ ] Verify CORS settings
-
----
-
-### 18. Configure Stripe Webhooks
-
-**Status:** ❌ Not Configured
-**Estimated Time:** 30 minutes
-**Priority:** HIGH
-
-**Action Items:**
-
-1. **Go to Stripe Dashboard** → Developers → Webhooks
-2. **Add endpoint:** `https://your-backend-url.com/api/v1/payments/webhook`
-3. **Select events:**
-   - `checkout.session.completed`
-   - `payment_intent.succeeded`
-   - `payment_intent.payment_failed`
-4. **Copy webhook signing secret** → Add to `STRIPE_WEBHOOK_SECRET`
-5. **Implement webhook handler** (currently placeholder in `payments.py`)
-
-```python
-# Update backend/app/api/payments.py
-
-import stripe
-from fastapi import Request
-
-@router.post("/webhook")
-async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
-    payload = await request.body()
-    sig_header = request.headers.get('stripe-signature')
-
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-        )
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload")
-
-    # Handle checkout.session.completed
-    if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        case_id = session['metadata']['case_id']
-
-        # Update payment status
-        payment = await db.execute(
-            select(Payment).where(Payment.stripe_session_id == session['id'])
-        )
-        payment = payment.scalar_one_or_none()
-
-        if payment:
-            payment.status = PaymentStatus.SUCCEEDED
-            payment.stripe_payment_intent_id = session['payment_intent']
-            await db.commit()
-
-    return {"status": "success"}
-```
-
----
-
-### 19. DNS & Domain Setup
-
-**Status:** ❌ Not Configured
-**Estimated Time:** 1 hour
-**Priority:** MEDIUM
-
-**Action Items:**
-
-1. **Buy domain** (Namecheap, Google Domains, etc.)
-2. **Configure DNS:**
-   - `A` record: `@` → Backend IP (if self-hosting)
-   - `CNAME` record: `www` → Vercel/Railway URL
-   - `CNAME` record: `api` → Backend URL
-3. **Update environment variables:**
-   ```bash
-   NEXTAUTH_URL=https://casepack.com
-   ALLOWED_ORIGINS=https://casepack.com,https://www.casepack.com
-   ```
-4. **Configure SSL** (automatic on Vercel/Railway)
-
----
-
-## 🟢 Post-Launch Tasks
-
-### 20. Monitoring & Logging
-
-**Status:** ⚠️ Basic Logging Only
-**Estimated Time:** 1 day
-**Priority:** MEDIUM
-
-**Action Items:**
-
-#### Error Tracking (Sentry)
-```bash
-# Add to requirements.txt
-sentry-sdk[fastapi]==1.40.0
-
-# Configure in main.py
-import sentry_sdk
-sentry_sdk.init(dsn=settings.SENTRY_DSN)
-```
-
-#### Application Monitoring
-- [ ] Set up Sentry for error tracking
-- [ ] Configure log aggregation (Logtail, Papertrail)
-- [ ] Set up uptime monitoring (UptimeRobot, Pingdom)
-- [ ] Create alerts for critical errors
-
-#### Analytics (Optional)
-- [ ] Add Google Analytics or Plausible
-- [ ] Track key metrics (registrations, cases created, payments)
-
----
-
-### 21. Backup & Disaster Recovery
-
-**Status:** ❌ Not Configured
-**Estimated Time:** 3 hours
-**Priority:** HIGH
-
-**Action Items:**
-
-#### Database Backups
-```bash
-# Automated daily backups
-0 3 * * * pg_dump -U casepack casepack > /backups/db_$(date +\%Y\%m\%d).sql
-```
-
-- [ ] Set up automated database backups
-- [ ] Test restore process
-- [ ] Store backups in separate location (S3)
-- [ ] Set retention policy (keep 30 days)
-
-#### File Storage Backups
-- [ ] If using S3, enable versioning
-- [ ] Set up cross-region replication (optional)
-
----
-
-### 22. Documentation & Support
-
-**Status:** ⚠️ Developer Docs Only
-**Estimated Time:** 1 week
-**Priority:** LOW
-
-**Action Items:**
-
-- [ ] Create user guide (how to use CasePack)
-- [ ] Create video tutorial
-- [ ] Set up help center / FAQ
-- [ ] Create support email (support@casepack.com)
-- [ ] Add chatbot for common questions (optional)
-
----
-
-## 🔵 Optional Enhancements
-
-### 23. Nice-to-Have Features
-
-**Priority:** LOW
-**Implement After Launch**
-
-#### Chat Platform Auto-Detection
-- [ ] WhatsApp export parser
-- [ ] Facebook Messenger parser
-- [ ] iMessage parser
-- [ ] Email threading
-
-#### Advanced Timeline Features
-- [ ] Visual timeline (chart/graph)
-- [ ] Filter by date range
-- [ ] Search events
-- [ ] Tag/categorize events
-
-#### Collaboration Features
-- [ ] Share case with attorney
-- [ ] Add comments to events
-- [ ] Version history
-
-#### Mobile App
-- [ ] React Native app
-- [ ] File upload from phone
-- [ ] Push notifications
-
-#### B2B Features
-- [ ] Law firm dashboards
-- [ ] Multi-user accounts
-- [ ] White-label option
-- [ ] API access for integrations
-
----
-
-## 📊 Summary Timeline
-
-### Minimum Viable Product (2-3 weeks)
-
-**Week 1:**
-- ✅ Configure API keys and environment
-- ✅ Fix database migrations
-- ✅ Fix async worker issues
-- ✅ Build auth pages (login/register)
-- ✅ Build basic dashboard
-
-**Week 2:**
-- ✅ Build file upload UI
-- ✅ Build timeline review UI
-- ✅ Implement payment flow
-- ✅ Build download page
-- ✅ End-to-end testing
-
-**Week 3:**
-- ✅ Security hardening
-- ✅ Deploy to production
-- ✅ Configure monitoring
-- ✅ Launch! 🚀
-
-### Full-Featured Product (6-8 weeks)
-
-Add:
-- Complete admin panel
-- Comprehensive testing
-- Advanced timeline features
-- Email notifications
-- Marketing site
-- Customer support system
-
----
-
-## 🎯 Critical Path to Launch
-
-**Absolute Must-Haves (Cannot Launch Without):**
-
-1. ✅ Database migrations working
-2. ✅ File upload + OCR functional
-3. ✅ Timeline generation working
-4. ✅ PDF generation working
-5. ✅ Payment flow complete
-6. ✅ Frontend UI built (at least basic)
-7. ✅ Deployed to production
-8. ✅ HTTPS/SSL configured
-9. ✅ Stripe webhooks working
-
-**Nice-to-Haves (Can Add Post-Launch):**
-
-- Admin panel
-- Advanced filters
-- Email notifications
-- Mobile responsiveness improvements
-- Performance optimizations
-
----
-
-## 💡 Recommended Approach
-
-### Phase 1: Get It Working (Week 1)
-Focus on backend functionality:
-- Fix migrations
-- Fix async issues
-- Test OCR → Timeline → PDF pipeline
-- Verify payments work end-to-end
-
-### Phase 2: Build UI (Week 2-3)
-Focus on frontend:
-- Auth pages
-- Dashboard
-- Upload flow
-- Timeline review
-- Payment checkout
-
-### Phase 3: Deploy & Test (Week 3-4)
-- Deploy to staging
-- End-to-end testing
-- Fix bugs
-- Deploy to production
-- Soft launch to beta users
-
-### Phase 4: Polish & Scale (Month 2+)
-- Gather feedback
-- Add features
-- Optimize performance
-- Marketing & growth
-
----
-
-## ✅ Quick Start Checklist
-
-**Today:**
-- [ ] Set up API keys (Anthropic, Stripe)
-- [ ] Configure .env file
-- [ ] Run `docker-compose up` and verify services start
-- [ ] Create database migrations
-- [ ] Test backend API with Postman/Insomnia
-
-**This Week:**
-- [ ] Fix async worker issues
-- [ ] Build login/register pages
-- [ ] Build dashboard page
+## Phase 11: Testing Infrastructure ❌ TODO
+
+### 11.1 Testing Setup
+- [ ] Install Vitest (`npm install -D vitest @testing-library/react`)
+- [ ] Configure `vitest.config.ts`
+- [ ] Set up test database
+
+### 11.2 Unit Tests
+- [ ] Test utility functions
+- [ ] Test API routes
+- [ ] Test React components
+- [ ] Test database queries
+
+### 11.3 Integration Tests
+- [ ] Test authentication flow
 - [ ] Test file upload
+- [ ] Test payment flow
+- [ ] Test PDF generation
 
-**Next Week:**
-- [ ] Build timeline review UI
-- [ ] Implement payment flow
-- [ ] Deploy to staging environment
+### 11.4 E2E Tests
+- [ ] Install Playwright (`npm install -D @playwright/test`)
+- [ ] Test user registration → upload → packet generation
+- [ ] Test subscription upgrade
+- [ ] Test document search
 
----
+**Target:** >70% code coverage
 
-## 📞 Need Help?
-
-**Common Issues:**
-- Check `DEPLOYMENT.md` for troubleshooting
-- Review backend logs: `docker-compose logs backend`
-- Test API: http://localhost:8000/docs
-
-**Resources:**
-- FastAPI docs: https://fastapi.tiangolo.com
-- Next.js docs: https://nextjs.org/docs
-- Stripe integration: https://stripe.com/docs/checkout
-- Anthropic API: https://docs.anthropic.com
+**Estimated Time:** 5-7 days
 
 ---
 
-**Last Updated:** November 2024
-**Version:** 2.0
+## Phase 12: CI/CD & Deployment ❌ TODO
+
+### 12.1 GitHub Actions
+- [ ] Create `.github/workflows/ci.yml`
+- [ ] Run tests on PR
+- [ ] Run type checking
+- [ ] Run linting
+- [ ] Build verification
+- [ ] Security scanning
+
+### 12.2 Docker Setup
+- [ ] Create `Dockerfile`
+- [ ] Update `docker-compose.yml` for production
+- [ ] Add health checks
+- [ ] Optimize image size
+
+### 12.3 Deployment Configuration
+- [ ] Vercel deployment (frontend + API routes)
+- [ ] Database hosting (Vercel Postgres / Neon / Supabase)
+- [ ] Redis hosting (Upstash)
+- [ ] S3 bucket setup (AWS / DigitalOcean Spaces)
+- [ ] Environment variables in production
+
+### 12.4 Health Checks
+- [ ] `/api/health` endpoint
+- [ ] Database connectivity check
+- [ ] Redis connectivity check
+- [ ] S3 connectivity check
+- [ ] External API checks (Anthropic, Stripe)
+
+**Estimated Time:** 2-3 days
+
+---
+
+## Phase 13: Documentation ❌ TODO
+
+### 13.1 Technical Docs
+- [ ] `ARCHITECTURE.md` - System design
+- [ ] `SECURITY.md` - Security practices
+- [ ] `API.md` - API reference
+- [ ] `DEPLOYMENT.md` - Deployment guide
+- [ ] `CONTRIBUTING.md` - Contribution guidelines
+
+### 13.2 User Documentation
+- [ ] User guide (how to use Life-Doc-Vault)
+- [ ] FAQ page
+- [ ] Privacy policy
+- [ ] Terms of service
+- [ ] Help center
+
+**Estimated Time:** 2-3 days
+
+---
+
+## Phase 14: Beta Testing & Polish ❌ TODO
+
+### 14.1 Performance Optimization
+- [ ] Optimize images (Next.js Image component)
+- [ ] Lazy loading
+- [ ] Code splitting
+- [ ] Database query optimization
+- [ ] Caching strategy (React Query + Redis)
+
+### 14.2 UX Improvements
+- [ ] Loading states everywhere
+- [ ] Error boundaries
+- [ ] Toast notifications
+- [ ] Accessibility (WCAG 2.1 AA)
+- [ ] Mobile responsiveness
+
+### 14.3 Beta Testing
+- [ ] Invite beta users
+- [ ] Collect feedback
+- [ ] Fix bugs
+- [ ] Iterate on UX
+
+**Estimated Time:** 2-3 weeks
+
+---
+
+## Phase 15: Production Launch 🚀 TODO
+
+### 15.1 Pre-Launch Checklist
+- [ ] Security audit completed
+- [ ] Load testing completed
+- [ ] Backup system in place
+- [ ] Monitoring configured
+- [ ] Documentation complete
+- [ ] Legal pages published
+- [ ] Support email set up
+
+### 15.2 Go Live
+- [ ] Deploy to production
+- [ ] Test critical paths
+- [ ] Monitor for errors (first 24 hours)
+- [ ] Announce on social media
+- [ ] Product Hunt launch (optional)
+
+### 15.3 Post-Launch
+- [ ] Monitor metrics
+- [ ] Respond to user feedback
+- [ ] Fix critical bugs immediately
+- [ ] Plan next features
+
+**Estimated Time:** 1 week
+
+---
+
+## 📊 Overall Timeline Estimate
+
+| Phase | Estimated Time |
+|-------|---------------|
+| Phase 1: Foundation | 2-3 days |
+| Phase 2: Database Schema | 1-2 days |
+| Phase 3: Authentication | 3-4 days |
+| Phase 4: Core UI | 2-3 days |
+| Phase 5: Document Management | 5-7 days |
+| Phase 6: AI & OCR | 6-8 days |
+| Phase 7: Evidence Packets | 5-6 days |
+| Phase 8: Payments | 4-5 days |
+| Phase 9: Security | 3-4 days |
+| Phase 10: Monitoring | 2 days |
+| Phase 11: Testing | 5-7 days |
+| Phase 12: CI/CD | 2-3 days |
+| Phase 13: Documentation | 2-3 days |
+| Phase 14: Beta Testing | 2-3 weeks |
+| Phase 15: Launch | 1 week |
+
+**Total Development Time:** 8-12 weeks (2-3 months of focused work)
+
+---
+
+## 🎯 Success Criteria
+
+### Minimum Viable Product (MVP)
+- [ ] User can sign up and log in
+- [ ] User can upload documents
+- [ ] Documents are securely stored
+- [ ] Basic OCR extraction works
+- [ ] Simple timeline generation
+- [ ] Can generate a basic PDF packet
+- [ ] Payment system functional
+- [ ] Deployed to production
+
+### Production Ready
+- [ ] All security measures implemented
+- [ ] >70% test coverage
+- [ ] All critical bugs fixed
+- [ ] Documentation complete
+- [ ] Monitoring and alerting configured
+- [ ] Performance targets met
+- [ ] Legal compliance (GDPR, privacy)
+- [ ] Beta testing completed
+
+---
+
+## 📝 Notes
+
+- This is an aggressive timeline assuming focused, full-time work
+- Add 50-100% buffer for unexpected issues
+- Prioritize MVP features first, add polish later
+- Can deploy beta/alpha versions earlier for feedback
+
+---
+
+**Last Updated:** 2025-11-17
+**Next Review:** After Phase 1 completion
