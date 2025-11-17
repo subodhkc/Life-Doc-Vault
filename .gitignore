@@ -54,6 +54,9 @@ yarn-error.log*
 .next/
 out/
 build/
+next-env.d.ts
+.vercel
+*.tsbuildinfo
 
 # Production
 /dist

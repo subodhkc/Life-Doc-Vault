@@ -1,0 +1,203 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Tier {
+  FREE
+  PERSONAL
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum Category {
+  LEGAL
+  MEDICAL
+  FINANCIAL
+  PERSONAL
+  OTHER
+}
+
+enum PacketStatus {
+  DRAFT
+  PROCESSING
+  READY
+  FAILED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String    // Hashed with bcrypt
+  role          Role      @default(USER)
+  tier          Tier      @default(FREE)
+  storageUsed   BigInt    @default(0) // Bytes
+  documentCount Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+
+  documents  Document[]
+  packets    Packet[]
+  auditLogs  AuditLog[]
+  sessions   Session[]
+  accounts   Account[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Document {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  filename      String
+  originalName  String
+  mimeType      String
+  fileSize      BigInt
+  fileHash      String    // SHA-256 hash for integrity
+  storagePath   String
+
+  category      Category?
+  tags          String[]
+
+  uploadedAt    DateTime  @default(now())
+  processedAt   DateTime?
+
+  ocrText       String?   @db.Text
+  extractedData Json?     // AI extraction results
+
+  isDeleted     Boolean   @default(false)
+  deletedAt     DateTime?
+
+  events        Event[]
+  packets       Packet[]  @relation("PacketDocuments")
+
+  @@index([userId])
+  @@index([category])
+  @@index([uploadedAt])
+  @@index([isDeleted])
+  @@map("documents")
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  eventDate   DateTime
+  eventTime   String?  // Optional time component
+  description String   @db.Text
+  entities    String[] // People, places, organizations
+  confidence  Float    @default(0.0) // 0.0 to 1.0
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([documentId])
+  @@index([eventDate])
+  @@map("events")
+}
+
+model Packet {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?      @db.Text
+
+  status      PacketStatus @default(DRAFT)
+  generatedAt DateTime?
+  pdfPath     String?
+
+  documents   Document[]   @relation("PacketDocuments")
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("packets")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  action     String   // LOGIN, UPLOAD, DELETE, GENERATE_PACKET, etc.
+  resource   String?  // Document ID, Packet ID, etc.
+  ipAddress  String?
+  userAgent  String?
+  metadata   Json?
+
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("tags")
+}
